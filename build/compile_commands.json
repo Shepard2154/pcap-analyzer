@@ -1,0 +1,8 @@
+[
+{
+  "directory": "/home/dev/Projects/job/pcap-analyzer/build",
+  "command": "/usr/bin/g++-12   -g -o CMakeFiles/app.dir/main.cpp.o -c /home/dev/Projects/job/pcap-analyzer/src/c++/main.cpp",
+  "file": "/home/dev/Projects/job/pcap-analyzer/src/c++/main.cpp",
+  "output": "CMakeFiles/app.dir/main.cpp.o"
+}
+]
