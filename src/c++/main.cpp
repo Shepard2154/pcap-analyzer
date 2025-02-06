@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 #include <cstring>
 #include <iomanip>
 #include <stdio.h>
@@ -78,6 +79,41 @@ void print_ip_packet_info(const sniff_ip* packet, pcap_pkthdr* header) {
     cout << endl;
 }
 
+void write_to_csv(const string& filename, const map<tuple<string, string, string, string>, vector<int>>& data) {
+    int packets_count = 0;
+    int packets_bytes_size = 0;
+
+    ofstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "Ошибка открытия файла!" << std::endl;
+        return;
+    }
+
+    // Записываем заголовок CSV
+    file << "IP_source,IP_destination,port_source,port_destination,packets_count,packets_bytes\n";
+
+    // Записываем данные
+    for (const auto& entry : data) {
+        const auto& keys = entry.first; // Пара ключей
+        const auto& values = entry.second; // Вектор значений
+
+        // Записываем ключи
+        file << get<0>(keys) << "," << get<1>(keys) << "," << get<2>(keys) << ',' << get<3>(keys);
+
+        // Записываем значения
+        for (int value : values) {
+            packets_count++;
+            packets_bytes_size += value;
+        }
+
+        // Переход на новую строку
+        file << "," << packets_count << "," << packets_bytes_size << "\n";
+    }
+
+    // Закрываем файл
+    file.close();
+}
+
 
 int main(int argc, char *argv[]) {
     string file_path = "../assets/example-01.pcap";
@@ -112,7 +148,7 @@ int main(int argc, char *argv[]) {
 
     int result;
     int counter = 1;
-    map<pair<string, string>, vector<int>> data;
+    map<tuple<string, string, string, string>, vector<int>> data;
 
     u_int size_ip;
     const struct sniff_tcp *tcp;
@@ -125,8 +161,10 @@ int main(int argc, char *argv[]) {
     char destination_string[IP_ADDRESS_SIZE];
     in_addr_t source_address;
     in_addr_t destination_address;
-    string full_source_ip;
-    string full_destination_address;
+    string source_ip;
+    string source_port;
+    string destination_ip;
+    string destination_port;
 
     while ((pcap_next_ex(handle, &header, &packet)) == 1) {
         // Обработка пакета
@@ -169,13 +207,17 @@ int main(int argc, char *argv[]) {
 
         
         source_address = ip -> ip_src.s_addr;
-        full_source_ip = inet_ntop(AF_INET, &source_address, source_string, sizeof(source_string)) + to_string(ntohs(tcp_source_port));
+        source_ip = inet_ntop(AF_INET, &source_address, source_string, sizeof(source_string));
+        source_port = to_string(ntohs(tcp_source_port));
         
         destination_address = ip -> ip_dst.s_addr;
-        full_destination_address = inet_ntop(AF_INET, &destination_address, destination_string, sizeof(destination_string)) + to_string(ntohs(tcp_destination_port));
+        destination_ip = inet_ntop(AF_INET, &destination_address, destination_string, sizeof(destination_string));
+        destination_port = to_string(ntohs(tcp_destination_port));
 
-        data[{full_source_ip, full_destination_address}].push_back(header -> caplen);
+        data[{source_ip, destination_ip, source_port, destination_port}].push_back(header -> caplen);
     }
+
+    write_to_csv("output.csv", data);
 
     pcap_close(handle);
 }
