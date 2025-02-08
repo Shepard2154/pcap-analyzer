@@ -56,9 +56,10 @@ struct sniff_tcp {
 };
 
 struct sniff_udp {
-    u_short th_sport;	/* source port */
-    u_short th_dport;	/* destination port */
-    u_short th_sum;		/* checksum */
+    u_short uh_sport;	/* source port */
+    u_short uh_dport;	/* destination port */
+    u_short uh_len;	/* length */
+    u_short uh_sum;		/* checksum */
 };
 
 void print_ip_packet_info(const sniff_ip* packet, pcap_pkthdr* header) {
@@ -77,6 +78,13 @@ void print_ip_packet_info(const sniff_ip* packet, pcap_pkthdr* header) {
     cout << "Packet size: " << header -> len << endl;
     cout << "Number of bytes: " << header -> caplen << endl;
     cout << endl;
+}
+
+void print_udp_header(const struct sniff_udp *udp) {
+    cout << "UDP source Port: " << to_string(ntohs(udp -> uh_sport)) << endl;
+    cout << "UDP destination Port: " << to_string(ntohs(udp-> uh_dport)) << endl;
+    cout << "UDP length: " << to_string(ntohs(udp -> uh_len)) << endl;
+    cout << "UDP checksum: " << to_string(ntohs(udp -> uh_sum)) << endl << endl;
 }
 
 void write_to_csv(const string& filename, const map<tuple<string, string, string, string>, vector<int>>& data) {
@@ -116,7 +124,7 @@ void write_to_csv(const string& filename, const map<tuple<string, string, string
 
 
 int main(int argc, char *argv[]) {
-    string file_path = "../assets/example-01.pcap";
+    string file_path = "../assets/example-02.pcap";
     char error_buffer[PCAP_ERRBUF_SIZE];
     int pcap_init(unsigned int opts, char *error_buffer);
     char *dev, errbuf[PCAP_ERRBUF_SIZE];
@@ -154,8 +162,11 @@ int main(int argc, char *argv[]) {
     const struct sniff_tcp *tcp;
     const u_char *payload;
     u_int size_tcp;
-    u_short tcp_source_port;
-    u_short tcp_destination_port;
+
+    const struct sniff_udp *udp;
+    u_int size_udp;
+    u_short udp_source_port;
+    u_short udp_destination_port;
 
     char source_string[IP_ADDRESS_SIZE];
     char destination_string[IP_ADDRESS_SIZE];
@@ -190,29 +201,35 @@ int main(int argc, char *argv[]) {
             return -1;
         }
 
-        tcp = (struct sniff_tcp*)(packet + SIZE_ETHERNET + size_ip);
-        size_tcp = TH_OFF(tcp) * 4;
-        if (size_tcp < 20) {
-            printf("   * Invalid TCP header length: %u bytes\n", size_tcp);
-            return -1;
-        }
-        payload = (u_char *)(packet + SIZE_ETHERNET + size_ip + size_tcp);
-
-        tcp_source_port = tcp -> th_sport;
-        tcp_destination_port = tcp -> th_dport;
-
-        cout << "TCP source port: " << ntohs(tcp_source_port) << endl;
-        cout << "TCP destination port: " << ntohs(tcp_destination_port) << endl;
-        cout << "TCP payload: " << sizeof(payload) << endl << endl;
-
-        
         source_address = ip -> ip_src.s_addr;
         source_ip = inet_ntop(AF_INET, &source_address, source_string, sizeof(source_string));
-        source_port = to_string(ntohs(tcp_source_port));
-        
         destination_address = ip -> ip_dst.s_addr;
         destination_ip = inet_ntop(AF_INET, &destination_address, destination_string, sizeof(destination_string));
-        destination_port = to_string(ntohs(tcp_destination_port));
+
+        if (int(ip -> ip_p) == 6) {
+            tcp = (struct sniff_tcp*)(packet + SIZE_ETHERNET + size_ip);
+            size_tcp = TH_OFF(tcp) * 4;
+            if (size_tcp < 20) {
+                printf("   * Invalid TCP header length: %u bytes\n", size_tcp);
+                return -1;
+            }
+            payload = (u_char *)(packet + SIZE_ETHERNET + size_ip + size_tcp);
+
+            cout << "TCP source port: " << ntohs(tcp -> th_sport) << endl;
+            cout << "TCP destination port: " << ntohs(tcp -> th_dport) << endl;
+            cout << "TCP payload: " << sizeof(payload) << endl << endl;
+
+            source_port = to_string(ntohs(tcp -> th_sport));
+            destination_port = to_string(ntohs(tcp -> th_dport));
+        } else if (int(ip -> ip_p) == 17) {
+            udp = (struct sniff_udp*)(packet + SIZE_ETHERNET + size_ip);
+            print_udp_header(udp);
+            source_port = to_string(ntohs(udp -> uh_sport));
+            destination_port = to_string(ntohs(udp -> uh_dport));
+        } else {
+            cout << "Packet could not be resolved as TCP | UDP: " << int(ip -> ip_vhl) << endl;
+            continue;
+        }
 
         data[{source_ip, destination_ip, source_port, destination_port}].push_back(header -> caplen);
     }
