@@ -3,24 +3,32 @@
 using namespace std;
 
 
+bool validate_ip_extractor(IpExtractor ip_extractor) {
+    bool is_fourth_version = ip_extractor.isIpV4();
+    if (!is_fourth_version) {
+        cout << "Пакет не относится к IPv4" << endl;
+        return false;
+    }
+
+    bool is_header_valid = ip_extractor.isHeaderValid();
+    if (!is_header_valid) {
+        cout << "Неверная длина заголовка";
+        return false;
+    }
+
+    return true;
+}
+
 int main(int argc, char *argv[]) {   
     char error_buffer[PCAP_ERRBUF_SIZE];
     int pcap_init(unsigned int opts, char *error_buffer);
 
-    char *dev, errbuf[PCAP_ERRBUF_SIZE];
-    pcap_if_t **alldevsp;
+    char *dev, net_error_buffer[PCAP_ERRBUF_SIZE];
     bpf_u_int32 mask, net;
-    pcap_lookupnet(dev, &net, &mask, errbuf);
+    pcap_lookupnet(dev, &net, &mask, net_error_buffer);
     
     // TODO - begin: CAPTURING PACKETS FROM NET INTERFACE 
-    // dev = pcap_lookupdev(errbuf);
-    // if (dev == NULL) 
-    // {
-    //     fprintf(stderr, "Couldn't find default device: %s\n", errbuf);
-    //     return(2);
-    // }
-    // printf("Device: %s\n", dev);
-    // return(0);
+    // dev = pcap_lookupdev(net_error_buffer);
     // TODO - end;
 
     string file_path = "../assets/example-02.pcap";
@@ -31,55 +39,45 @@ int main(int argc, char *argv[]) {
     }
     cout << "File " << file_path.c_str() << " available for reading" << endl;
 
-    const struct sniff_ip *ip;
-
-    struct pcap_pkthdr* header;
-    const u_char* packet;
-
+    // Processing variables
     int result;
     int counter = 1;
     map<tuple<string, string, string, string>, vector<int>> data;
 
+    // PCAP variables
+    struct pcap_pkthdr* header;
+    const u_char* packet;
+
+    // IP variables
+    const struct sniff_ip *ip;
     u_int size_ip;
+    bool is_valid;
+    string source_ip;
+    string destination_ip;
+
+    // TCP | UDP variables
+    string source_port;
+    string destination_port;
+
+    // TCP variables
     const struct sniff_tcp *tcp;
     u_int size_tcp;
 
+    // UDP variables
     const struct sniff_udp *udp;
     u_int size_udp;
-    u_short udp_source_port;
-    u_short udp_destination_port;
-
-    char source_string[IP_ADDRESS_SIZE];
-    char destination_string[IP_ADDRESS_SIZE];
-    in_addr_t source_address;
-    in_addr_t destination_address;
-    string source_ip;
-    string source_port;
-    string destination_ip;
-    string destination_port;
-
+    
     while ((pcap_next_ex(handle, &header, &packet)) == 1) {
-        cout << "Обработка Пакета #" << counter++ << endl;
-
+        cout << "Обработка пакета #" << counter++ << endl;
         ip = (struct sniff_ip*)(packet + SIZE_ETHERNET);
-        if (ip -> ip_vhl != 0x45) {
-            cout << "Пакет не относится к IPv4" << endl;
-            continue;
-        }
-        
+        size_ip = IP_HL(*ip) * 4;
         IpExtractor ip_extractor(*ip);
-        ip_extractor.PrintInfo(header);
-
-        size_ip = IP_HL(ip) * 4;
-        if (size_ip < 20 && size_ip > 60) {
-            printf("Invalid IP header length: %u bytes\n", size_ip);
-            return -1;
-        }
-
-        source_address = ip -> ip_src.s_addr;
-        source_ip = inet_ntop(AF_INET, &source_address, source_string, sizeof(source_string));
-        destination_address = ip -> ip_dst.s_addr;
-        destination_ip = inet_ntop(AF_INET, &destination_address, destination_string, sizeof(destination_string));
+        is_valid = validate_ip_extractor(ip_extractor);
+        if (is_valid) {
+            ip_extractor.PrintInfo(header);
+            source_ip = ip_extractor.GetSourceIp();
+            destination_ip = ip_extractor.GetDestinationIp();
+        } else { continue; }
 
         if (int(ip -> ip_p) == 6) {
             tcp = (struct sniff_tcp*)(packet + SIZE_ETHERNET + size_ip);
