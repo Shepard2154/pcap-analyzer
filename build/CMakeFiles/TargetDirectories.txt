@@ -1,3 +1,0 @@
-/home/dev/Projects/job/pcap-analyzer/build/CMakeFiles/main.dir
-/home/dev/Projects/job/pcap-analyzer/build/CMakeFiles/edit_cache.dir
-/home/dev/Projects/job/pcap-analyzer/build/CMakeFiles/rebuild_cache.dir
