@@ -3,6 +3,11 @@
 using namespace std;
 
 
+enum class Protocol {
+    TCP = 6,
+    UDP = 17,
+};
+
 bool validate_ip_extractor(IpExtractor ip_extractor) {
     bool is_fourth_version = ip_extractor.isIpV4();
     if (!is_fourth_version) {
@@ -20,6 +25,11 @@ bool validate_ip_extractor(IpExtractor ip_extractor) {
 }
 
 int main(int argc, char *argv[]) {   
+    if (argc < 3) {
+        std::cerr << "Пример вызова: " << argv[0] << " ../assets/example-01.pcap output" << endl;
+        return -1;
+    }
+
     char error_buffer[PCAP_ERRBUF_SIZE];
     int pcap_init(unsigned int opts, char *error_buffer);
 
@@ -31,13 +41,13 @@ int main(int argc, char *argv[]) {
     // dev = pcap_lookupdev(net_error_buffer);
     // TODO - end;
 
-    string file_path = "../assets/example-02.pcap";
+    string file_path = argv[1];
     pcap_t *handle = pcap_open_offline(file_path.c_str(), error_buffer);
     if (handle == NULL) {
-        fprintf(stderr, "Couldn't open file %s: %s\n", file_path.c_str(), error_buffer);
+        fprintf(stderr, "Ошибка при открытии файла %s: %s\n", file_path.c_str(), error_buffer);
         return -1;
     }
-    cout << "File " << file_path.c_str() << " available for reading" << endl;
+    cout << "Файл " << file_path.c_str() << " доступен для чтения" << endl;
 
     // Processing variables
     int result;
@@ -61,17 +71,15 @@ int main(int argc, char *argv[]) {
 
     // TCP variables
     const struct sniff_tcp *tcp;
-    u_int size_tcp;
 
     // UDP variables
     const struct sniff_udp *udp;
-    u_int size_udp;
     
     while ((pcap_next_ex(handle, &header, &packet)) == 1) {
         cout << "Обработка пакета #" << counter++ << endl;
         ip = (struct sniff_ip*)(packet + SIZE_ETHERNET);
-        size_ip = IP_HL(*ip) * 4;
-        IpExtractor ip_extractor(*ip);
+        size_ip = IP_HL(ip) * 4;
+        IpExtractor ip_extractor(ip);
         is_valid = validate_ip_extractor(ip_extractor);
         if (is_valid) {
             ip_extractor.PrintInfo(header);
@@ -79,36 +87,31 @@ int main(int argc, char *argv[]) {
             destination_ip = ip_extractor.GetDestinationIp();
         } else { continue; }
 
-        if (int(ip -> ip_p) == 6) {
+        if (Protocol(ip -> ip_p) == Protocol::TCP) {
             tcp = (struct sniff_tcp*)(packet + SIZE_ETHERNET + size_ip);
-            size_tcp = TH_OFF(tcp) * 4;
-            if (size_tcp < 20) {
-                printf("   * Invalid TCP header length: %u bytes\n", size_tcp);
-                return -1;
-            }
+            TcpExtractor tcp_extractor(tcp);
+            is_valid = tcp_extractor.isHeaderValid();
+            if (is_valid) {
+                tcp_extractor.PrintInfo();
+                source_port = to_string(ntohs(tcp -> th_sport));
+                destination_port = to_string(ntohs(tcp -> th_dport));
+            } else { continue; }
 
-            TcpExtractor tcp_extractor(*tcp);
-            tcp_extractor.PrintInfo();
 
-            source_port = to_string(ntohs(tcp -> th_sport));
-            destination_port = to_string(ntohs(tcp -> th_dport));
-        } else if (int(ip -> ip_p) == 17) {
+        } else if (Protocol(ip -> ip_p) == Protocol::UDP) {
             udp = (struct sniff_udp*)(packet + SIZE_ETHERNET + size_ip);
-            
-            UdpExtractor udp_extractor(*udp);
+            UdpExtractor udp_extractor(udp);
             udp_extractor.PrintInfo();
-
             source_port = to_string(ntohs(udp -> uh_sport));
             destination_port = to_string(ntohs(udp -> uh_dport));
         } else {
-            cout << "Packet could not be resolved as TCP | UDP: " << int(ip -> ip_vhl) << endl;
+            cout << "Пакет не распознан как TCP | UDP: " << int(ip -> ip_vhl) << endl;
             continue;
         }
 
         data[{source_ip, destination_ip, source_port, destination_port}].push_back(header -> caplen);
     }
 
-    write_to_csv("output.csv", data);
-
+    write_to_csv(argv[2] + string(".csv"), data);
     pcap_close(handle);
 }
