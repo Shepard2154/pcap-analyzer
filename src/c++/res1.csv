@@ -1,2 +1,0 @@
-IP_source,IP_destination,port_source,port_destination,packets_count,packets_bytes
-172.19.104.10,172.19.31.87,32640,32512,64,4619
