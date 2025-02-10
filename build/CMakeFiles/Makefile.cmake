@@ -28,7 +28,7 @@ set(CMAKE_MAKEFILE_DEPENDS
   "CMakeFiles/3.28.1/CMakeCCompiler.cmake"
   "CMakeFiles/3.28.1/CMakeCXXCompiler.cmake"
   "CMakeFiles/3.28.1/CMakeSystem.cmake"
-  "/home/dev/Projects/job/pcap-analyzer/src/c++/CMakeLists.txt"
+  "CMakeLists.txt"
   )
 
 # The corresponding makefile is:
@@ -44,5 +44,5 @@ set(CMAKE_MAKEFILE_PRODUCTS
 
 # Dependency information for all targets:
 set(CMAKE_DEPEND_INFO_FILES
-  "CMakeFiles/app.dir/DependInfo.cmake"
+  "CMakeFiles/main.dir/DependInfo.cmake"
   )
